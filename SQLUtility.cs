@@ -12,7 +12,7 @@ namespace CPUFramework
         public static SqlCommand GetSqlCommand(string sprocname)
         {
             SqlCommand cmd;
-            using ( SqlConnection conn = new SqlConnection(SQLUtility.ConnectionString))
+            using (SqlConnection conn = new SqlConnection(SQLUtility.ConnectionString))
             {
                 cmd = new SqlCommand(sprocname, conn);
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -25,10 +25,19 @@ namespace CPUFramework
         {
             return DoExecuteSQL(cmd, true);
         }
-        public static void SaveDataRow(DataRow row, string sprocname)
+        public static void SaveDataTable(DataTable dt, string sprocname)
+        {
+            var rows = dt.Select("", "", DataViewRowState.Added | DataViewRowState.ModifiedCurrent);
+            foreach(DataRow r in rows)
+            {
+                SaveDataRow(r, sprocname, false);
+            }
+            dt.AcceptChanges();
+        }
+        public static void SaveDataRow(DataRow row, string sprocname, bool acceptchanges = true)
         {
             SqlCommand cmd = GetSqlCommand(sprocname);
-            foreach(DataColumn col in row.Table.Columns)
+            foreach (DataColumn col in row.Table.Columns)
             {
                 string paramname = $"@{col.ColumnName}";
                 if (cmd.Parameters.Contains(paramname))
@@ -49,9 +58,13 @@ namespace CPUFramework
                     }
                 }
             }
+            if (acceptchanges == true)
+            {
+                row.Table.AcceptChanges();
+            }
         }
 
-        private static DataTable DoExecuteSQL (SqlCommand cmd,bool loadtable)
+        private static DataTable DoExecuteSQL(SqlCommand cmd, bool loadtable)
         {
             DataTable dt = new();
             using (SqlConnection conn = new SqlConnection(SQLUtility.ConnectionString))
@@ -77,9 +90,9 @@ namespace CPUFramework
                 {
                     throw new Exception(cmd.CommandText + ": " + ex.Message, ex);
                 }
-                
+
             }
-            SetAllColumnsAllowNull(dt);
+            SetColumnProperties(dt);
             return dt;
         }
 
@@ -100,7 +113,7 @@ namespace CPUFramework
                     }
                     else if (p.ParameterName.ToLower() == "@message")
                     {
-                        msg = p.Value.ToString();
+                        //msg = p.Value.ToString();
                     }
                 }
                 if (returnvalue == 1)
@@ -115,7 +128,7 @@ namespace CPUFramework
         }
         public static DataTable GetDataTable(string sqlstatement) // - take a SQL statement and return DataTable
         {
-            return DoExecuteSQL(new SqlCommand(sqlstatement),true);
+            return DoExecuteSQL(new SqlCommand(sqlstatement), true);
         }
         public static int GetFirstColumnFirstRowValue(string sql)
         {
@@ -136,7 +149,7 @@ namespace CPUFramework
         }
         public static void ExecuteSQL(SqlCommand cmd)
         {
-            DoExecuteSQL(cmd,false);
+            DoExecuteSQL(cmd, false);
         }
         public static void SetParamaterValue(SqlCommand cmd, string paramname, object value)
         {
@@ -144,9 +157,9 @@ namespace CPUFramework
             {
                 cmd.Parameters[paramname].Value = value;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                throw new Exception(cmd.CommandText + ": " + ex.Message,ex);
+                throw new Exception(cmd.CommandText + ": " + ex.Message, ex);
             }
         }
         private static string ParseConstraintMessage(string msg)
@@ -154,6 +167,8 @@ namespace CPUFramework
             string origmsg = msg;
             string prefix = "ck_";
             string endmsg = "";
+            string notnullprefix = "Cannot insert the value NULL into column '";
+
             if (msg.Contains(prefix) == false)
             {
                 if (msg.Contains("u_"))
@@ -164,6 +179,11 @@ namespace CPUFramework
                 else if (msg.Contains("f_"))
                 {
                     prefix = "f_";
+                }
+                else if (msg.Contains(notnullprefix))
+                {
+                    prefix = notnullprefix;
+                    endmsg = " cannot be blank.";
                 }
             }
             if (msg.Contains(prefix))
@@ -182,24 +202,66 @@ namespace CPUFramework
                     msg = msg.Replace("_", " ");
                     msg = msg + endmsg;
 
-                    if(prefix == "f_")
+                    if (prefix == "f_")
                     {
                         var words = msg.Split(" ");
                         if (words.Length > 1)
                         {
-                            msg = $"Cannot delete { words[0]} because it has a related {words[1]} record";
+                            msg = $"Cannot delete {words[0]} because it has a related {words[1]} record";
                         }
                     }
                 }
             }
             return msg;
         }
-        private static void SetAllColumnsAllowNull(DataTable dt)
+        private static void SetColumnProperties(DataTable dt)
         {
             foreach (DataColumn c in dt.Columns)
             {
                 c.AllowDBNull = true;
+                c.AutoIncrement = false;
             }
+        }
+        public static int GetValueFromFirstRowAsInt(
+            DataTable dt, string columnname)
+        {
+            int value = 0;
+
+            if (dt.Rows.Count > 0)
+            {
+                DataRow r = dt.Rows[0];
+                if (r[columnname] != null && r[columnname] is int)
+                {
+                    value = (int)r[columnname];
+                }
+            }
+
+            return value;
+        }
+        public static string GetValueFromFirstRowAsString(DataTable dt, string columnname)
+        {
+            string value = "";
+
+            if (dt.Rows.Count > 0)
+            {
+                DataRow r = dt.Rows[0];
+                if (r[columnname] != null && r[columnname] is string)
+                {
+                    value = (string)r[columnname];
+                }
+            }
+            return value;
+        }
+        public static bool TableHasChanges(DataTable dt)
+        {
+            bool b = false;
+
+            if (dt.GetChanges() != null)
+            {
+                b = true;
+            }
+
+            return b;
         }
         public static string GetSQL(SqlCommand cmd)
         {
@@ -208,7 +270,7 @@ namespace CPUFramework
             StringBuilder sb = new();
             if (cmd.Connection != null)
             {
-                sb.AppendLine($"--{ cmd.Connection.DataSource}");
+                sb.AppendLine($"--{cmd.Connection.DataSource}");
                 sb.AppendLine($"use {cmd.Connection.Database}");
                 sb.AppendLine($"go");
             }
