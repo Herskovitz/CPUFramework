@@ -28,7 +28,7 @@ namespace CPUFramework
         public static void SaveDataTable(DataTable dt, string sprocname)
         {
             var rows = dt.Select("", "", DataViewRowState.Added | DataViewRowState.ModifiedCurrent);
-            foreach(DataRow r in rows)
+            foreach (DataRow r in rows)
             {
                 SaveDataRow(r, sprocname, false);
             }
@@ -90,7 +90,6 @@ namespace CPUFramework
                 {
                     throw new Exception(cmd.CommandText + ": " + ex.Message, ex);
                 }
-
             }
             SetColumnProperties(dt);
             return dt;
@@ -113,7 +112,10 @@ namespace CPUFramework
                     }
                     else if (p.ParameterName.ToLower() == "@message")
                     {
-                        //msg = p.Value.ToString();
+                        if (p.Value != null)
+                        {
+                            msg = p.Value.ToString();
+                        }
                     }
                 }
                 if (returnvalue == 1)
@@ -301,7 +303,7 @@ namespace CPUFramework
         }
         public static void DebugPrintDataTable(DataTable dt)
         {
-            foreach (DataRow r in dt.Rows)
+            foreach (DataRow r in dt.Rows) 
             {
                 foreach (DataColumn c in dt.Columns)
                 {
