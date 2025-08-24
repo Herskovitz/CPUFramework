@@ -34,7 +34,7 @@ namespace CPUFramework
             }
             dt.AcceptChanges();
         }
-        public static void SaveDataRow(DataRow row, string sprocname, bool acceptchanges = true)
+        public static void  SaveDataRow(DataRow row, string sprocname, bool acceptchanges = true)
         {
             SqlCommand cmd = GetSqlCommand(sprocname);
             foreach (DataColumn col in row.Table.Columns)
